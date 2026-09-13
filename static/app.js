@@ -64,9 +64,13 @@ function sqlBlock(data) {
     data.rewrites.forEach((r) => ul.appendChild(el("li", "", r)));
     body.appendChild(ul);
   }
-  if (data.attempts && data.attempts.length) {
+  // don't repeat the SQL already shown above unless the whole question failed
+  const attempts = (data.attempts || []).filter(
+    (a) => a.sql !== data.sql || data.status === "failed"
+  );
+  if (attempts.length) {
     body.appendChild(el("div", "label", "Failed attempts"));
-    data.attempts.forEach((a) => {
+    attempts.forEach((a) => {
       body.appendChild(el("pre", "", a.sql));
       body.appendChild(el("div", "attempt-err", a.error));
     });

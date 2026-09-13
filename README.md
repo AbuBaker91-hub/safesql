@@ -20,6 +20,22 @@ Teams want "just let people ask the database questions", but handing an LLM a da
 
 (Loom video coming soon) · (live demo coming soon)
 
+**Ask a question — results table plus a one-sentence summary built from the rows:**
+
+![Good question: results table and summary](docs/screenshots/02-good-question-table-summary.png)
+
+**Expand "SQL that ran" — the model's rationale and every rewrite the guard applied:**
+
+![SQL block with rationale and the LIMIT 200 rewrite](docs/screenshots/03-sql-block-rewrites.png)
+
+**Ask for something destructive — blocked with the exact reason, and the attempted SQL shown:**
+
+![Blocked DROP TABLE with reason "not a SELECT"](docs/screenshots/04-blocked-delete.png)
+
+**Every question lands in the history with its status and latency:**
+
+![History panel with ok and blocked queries](docs/screenshots/05-history.png)
+
 ## 3. Architecture
 
 ```mermaid
