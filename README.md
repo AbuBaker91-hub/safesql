@@ -18,7 +18,7 @@ Teams want "just let people ask the database questions", but handing an LLM a da
 - **MCP server** (`mcp_server.py`): tools `describe_schema` and `query_readonly` reuse the exact same guard and executor, so Claude Desktop / Claude Code can query the demo DB safely.
 - Demo data: the Chinook music store (artists, albums, tracks, invoices, customers).
 
-(Loom video coming soon) · (live demo coming soon)
+[▶ Watch the 30-second demo video](docs/safesql-demo.mp4) · (live demo coming soon)
 
 **Ask a question — results table plus a one-sentence summary built from the rows:**
 
@@ -95,6 +95,7 @@ All deterministic, all tested, all enforced by parsing (sqlglot, postgres dialec
 - The guard's allow-list check is table-level, not column-level.
 - Case-insensitive allow-list matching can accept a quoted spelling (e.g. `"Artist"`) that Postgres itself will then reject; that surfaces as a normal execution error and repair attempt, never a security hole.
 - One repair attempt, then an honest failure — no agentic retry loops.
+- When `READONLY_DATABASE_URL` is not set (managed Postgres with a single connection string, e.g. Neon), execution connects with `DATABASE_URL` and drops privileges with `SET LOCAL ROLE readonly_app` inside the `READ ONLY` transaction — the SELECT-only role, read-only transaction and 5s timeout all still apply; there is just no separate login.
 - The offline demo (`LLM_PROVIDER_ORDER=mock`) uses canned proposals, so the answers rotate through a fixed set; real questions need a free Gemini or Groq key.
 - Chinook sample database © Luis Rocha, committed as `db/chinook.sql` (v1.4.5, lowercase identifiers) under its [license](https://github.com/lerocha/chinook-database/blob/master/LICENSE.md).
 
@@ -107,6 +108,21 @@ make demo                 # http://localhost:8000
 ```
 
 Or fully containerized: `docker compose up --build` (defaults to the keyless mock provider).
+
+### Deploy (Vercel + Neon, free tier)
+
+The repo is serverless-ready: `api/index.py` exposes the ASGI app, `vercel.json` routes everything to it, and `requirements.txt` holds the runtime deps. Cold starts only run idempotent migrations and build the schema summary (a handful of catalog queries) — the 600 KB Chinook dump is **never** loaded at cold start.
+
+1. Neon: create a free project, copy the pooled `DATABASE_URL`.
+2. Seed the remote database **once** from your machine (migrations + Chinook + readonly role):
+
+   ```bash
+   # bash:        DATABASE_URL="postgres://<neon-owner-url>" .venv/bin/python -m app.seed
+   # PowerShell:  $env:DATABASE_URL="postgres://<neon-owner-url>"; .venv\Scripts\python.exe -m app.seed
+   ```
+
+3. Vercel: import the repo, set env vars `DATABASE_URL` and `LLM_PROVIDER_ORDER=mock` (keyless demo) — no `READONLY_DATABASE_URL` needed; execution falls back to `SET LOCAL ROLE readonly_app` (see Limits).
+4. Confirm `https://<app>.vercel.app/health` returns `{"ok": true}`.
 
 ### Deploy (Render + Neon, free tier)
 

@@ -19,6 +19,7 @@ from collections.abc import Callable
 
 import psycopg
 from aiforge_core import audit
+from aiforge_core.db import database_url
 from aiforge_core.llm import AllProvidersFailed, Router, ValidationFailed
 
 from .generate import propose_sql
@@ -29,18 +30,26 @@ from .summarize import summarize_rows
 RunFn = Callable[[str], tuple[list[str], list[tuple]]]
 
 
-def readonly_url() -> str:
-    return os.environ.get(
-        "READONLY_DATABASE_URL", "postgresql://readonly_app:readonly@localhost:5432/app"
-    )
-
-
 def run_readonly(sql: str, url: str | None = None) -> tuple[list[str], list[tuple]]:
-    """Run one statement as readonly_app: READ ONLY transaction, 5s timeout."""
-    with psycopg.connect(url or readonly_url()) as conn:  # autocommit off: a real txn
+    """Run one statement as readonly_app: READ ONLY transaction, 5s timeout.
+
+    Preferred: READONLY_DATABASE_URL (a real login as the SELECT-only role).
+    Fallback (single connection string, e.g. Neon): connect with DATABASE_URL
+    and drop privileges via SET LOCAL ROLE readonly_app inside the READ ONLY
+    transaction — same guarantees, one connection string.
+    """
+    set_role = False
+    if url is None:
+        url = os.environ.get("READONLY_DATABASE_URL")
+        if not url:
+            url = database_url()
+            set_role = True
+    with psycopg.connect(url) as conn:  # autocommit off: a real transaction
         with conn.cursor() as cur:
             cur.execute("SET TRANSACTION READ ONLY")
             cur.execute("SET LOCAL statement_timeout = 5000")
+            if set_role:
+                cur.execute("SET LOCAL ROLE readonly_app")
             cur.execute(sql)
             columns = [d.name for d in cur.description] if cur.description else []
             rows = cur.fetchall()

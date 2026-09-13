@@ -6,3 +6,9 @@ __pycache__/
 .ruff_cache/
 uv.lock
 dist/
+.vercel/
+.env.local
+
+.vercel
+.env*
+!.env.example

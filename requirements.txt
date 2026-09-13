@@ -1,0 +1,4 @@
+# Runtime deps only (Vercel serverless). Dev/test tooling lives in pyproject [dev].
+aiforge-core @ git+https://github.com/AbuBaker91-hub/aiforge-core@v0.1.0
+fastapi>=0.115
+sqlglot>=25.0

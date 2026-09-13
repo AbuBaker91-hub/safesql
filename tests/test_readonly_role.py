@@ -35,6 +35,20 @@ def test_insert_as_readonly_role_is_denied(readonly_url):
             conn.execute("INSERT INTO artist VALUES (999, 'x')")
 
 
+def test_set_role_fallback_without_readonly_url(readonly_url, test_db, monkeypatch):
+    """Single connection string (Neon-style): DATABASE_URL + SET LOCAL ROLE readonly_app."""
+    info = test_db.info
+    # membership so the connecting user may SET ROLE (what db/roles.sql grants)
+    test_db.execute(f'GRANT readonly_app TO "{info.user}"')
+    owner_url = f"postgresql://{info.user}:{info.password}@{info.host}:{info.port}/{info.dbname}"
+    monkeypatch.delenv("READONLY_DATABASE_URL", raising=False)
+    monkeypatch.setenv("DATABASE_URL", owner_url)
+    columns, rows = run_readonly("SELECT name FROM artist ORDER BY artist_id")
+    assert columns == ["name"] and len(rows) == 2
+    with pytest.raises(psycopg.Error):
+        run_readonly("INSERT INTO artist VALUES (999, 'x')")
+
+
 def test_run_readonly_selects_but_never_writes(readonly_url):
     columns, rows = run_readonly("SELECT name FROM artist ORDER BY artist_id", url=readonly_url)
     assert columns == ["name"]
