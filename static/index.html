@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SafeSQL — the model proposes, the database disposes</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --panel-2: #1c2129; --border: #2d333b;
+    --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --ok: #3fb950;
+    --blocked: #f85149; --failed: #d29922; --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 0; min-height: 100vh; }
+  main { padding: 24px 32px; max-width: 900px; width: 100%; margin: 0 auto; }
+  header h1 { font-size: 20px; letter-spacing: .3px; }
+  header h1 span { color: var(--accent); }
+  header p { color: var(--muted); font-size: 13px; margin: 2px 0 18px; }
+  header a { color: var(--muted); }
+  #chat { display: flex; flex-direction: column; gap: 14px; margin-bottom: 90px; }
+  .q { align-self: flex-end; background: #1f3050; border: 1px solid #2c4a7c; padding: 8px 14px; border-radius: 14px 14px 2px 14px; max-width: 80%; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .card.blocked { border-color: var(--blocked); background: #2d1215; }
+  .card.failed { border-color: var(--failed); }
+  .status-line { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: .5px; }
+  .badge.ok { background: #12341c; color: var(--ok); }
+  .badge.blocked { background: #4b1113; color: var(--blocked); }
+  .badge.failed { background: #3b2c0f; color: var(--failed); }
+  .summary { font-size: 15px; margin-bottom: 10px; }
+  .reason { color: var(--blocked); font-weight: 600; }
+  .tbl-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { background: var(--panel-2); color: var(--muted); font-weight: 600; position: sticky; top: 0; }
+  tr:last-child td { border-bottom: none; }
+  details { border: 1px solid var(--border); border-radius: 6px; background: var(--panel-2); }
+  details summary { cursor: pointer; padding: 7px 10px; font-size: 13px; color: var(--muted); user-select: none; }
+  details[open] summary { border-bottom: 1px solid var(--border); }
+  .sql-body { padding: 10px; font-size: 13px; }
+  pre { font-family: var(--mono); font-size: 12.5px; white-space: pre-wrap; word-break: break-word; background: #0d1117; border: 1px solid var(--border); border-radius: 6px; padding: 10px; margin: 6px 0; }
+  .rewrites li { color: var(--accent); font-size: 12.5px; }
+  .attempt-err { color: var(--failed); font-family: var(--mono); font-size: 12px; }
+  .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; margin-top: 8px; }
+  #askbar { position: fixed; bottom: 0; left: 0; right: 320px; background: linear-gradient(transparent, var(--bg) 30%); padding: 24px 32px; }
+  #askform { display: flex; gap: 8px; max-width: 900px; margin: 0 auto; }
+  #question { flex: 1; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font-size: 15px; outline: none; }
+  #question:focus { border-color: var(--accent); }
+  button { background: var(--accent); color: #0d1117; font-weight: 700; border: none; border-radius: 8px; padding: 0 20px; font-size: 15px; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: wait; }
+  aside { background: var(--panel); border-left: 1px solid var(--border); padding: 20px 16px; }
+  aside h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 12px; }
+  .hist { border-bottom: 1px solid var(--border); padding: 8px 2px; font-size: 12.5px; }
+  .hist .hq { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hist .hmeta { color: var(--muted); font-size: 11.5px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .dot.ok { background: var(--ok); } .dot.blocked { background: var(--blocked); } .dot.failed { background: var(--failed); }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } aside { display: none; } #askbar { right: 0; } }
+</style>
+</head>
+<body>
+<div class="layout">
+  <main>
+    <header>
+      <h1>Safe<span>SQL</span></h1>
+      <p>Ask the Chinook music store database anything. The model proposes SQL, the guard disposes:
+         SELECT-only, allow-listed tables, LIMIT 200, read-only role, 5s timeout.
+         <a href="/schema" target="_blank">See the schema the model sees</a>.</p>
+    </header>
+    <div id="chat"></div>
+    <div id="askbar">
+      <form id="askform">
+        <input id="question" autocomplete="off" placeholder="e.g. Top 5 customers by total invoices" />
+        <button id="askbtn" type="submit">Ask</button>
+      </form>
+    </div>
+  </main>
+  <aside>
+    <h2>History</h2>
+    <div id="history"></div>
+  </aside>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>
