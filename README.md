@@ -18,7 +18,7 @@ Teams want "just let people ask the database questions", but handing an LLM a da
 - **MCP server** (`mcp_server.py`): tools `describe_schema` and `query_readonly` reuse the exact same guard and executor, so Claude Desktop / Claude Code can query the demo DB safely.
 - Demo data: the Chinook music store (artists, albums, tracks, invoices, customers).
 
-[▶ Watch the 30-second demo video](docs/safesql-demo.mp4) · (live demo coming soon)
+[▶ Watch the 30-second demo video](docs/safesql-demo.mp4) · [Try the live demo](https://safesql.vercel.app)
 
 **Ask a question — results table plus a one-sentence summary built from the rows:**
 
