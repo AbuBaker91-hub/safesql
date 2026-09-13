@@ -1,10 +1,21 @@
 -- Role readonly_app: SELECT only on the public schema. Idempotent.
+-- Managed hosts (e.g. Neon) reject the demo password via their password
+-- policy; the app only needs SET ROLE there, which works without a login,
+-- so fall back to a NOLOGIN role.
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'readonly_app') THEN
-        CREATE ROLE readonly_app LOGIN PASSWORD 'readonly';
+        BEGIN
+            CREATE ROLE readonly_app LOGIN PASSWORD 'readonly';
+        EXCEPTION WHEN OTHERS THEN
+            CREATE ROLE readonly_app NOLOGIN;
+        END;
     ELSE
-        ALTER ROLE readonly_app LOGIN PASSWORD 'readonly';
+        BEGIN
+            ALTER ROLE readonly_app LOGIN PASSWORD 'readonly';
+        EXCEPTION WHEN OTHERS THEN
+            NULL;
+        END;
     END IF;
 END
 $$;
